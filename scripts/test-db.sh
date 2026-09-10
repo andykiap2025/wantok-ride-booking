@@ -71,5 +71,16 @@ psql -h 127.0.0.1 -p "$PORT" -U postgres -d wantok_test -v ON_ERROR_STOP=1 \
   grep -E "(PASS|FAIL|ERROR|All behaviour)" |
   sed -E "s/^psql:.*[0-9]+: NOTICE:  //" || true
 
+# Separate database, because these run as `anon` and `authenticated` rather
+# than as postgres. That distinction is the whole point: a superuser bypasses
+# row-level security entirely, so the behaviour tests above never evaluate a
+# single policy — every one of them could be `using (true)` and they would
+# still pass.
+echo "--> row-level security tests, as anon and authenticated"
+setup_db wantok_rls
+psql -h 127.0.0.1 -p "$PORT" -U postgres -d wantok_rls -v ON_ERROR_STOP=1   -f "$ROOT/supabase/tests/03-rls.sql" 2>&1 |
+  grep -E "(PASS|FAIL|ERROR|All RLS)" |
+  sed -E "s/^psql:.*[0-9]+: NOTICE:  //" || true
+
 echo
 echo "--> done. Any line reading FAIL or ERROR above is a real failure."

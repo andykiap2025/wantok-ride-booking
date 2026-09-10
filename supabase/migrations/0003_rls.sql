@@ -286,6 +286,24 @@ create policy messages_send on messages
 -- Reviews
 -- ---------------------------------------------------------------------
 
+/**
+ * How many reviews a booking has.
+ *
+ * SECURITY DEFINER, and that is the entire point. The blind window needs to
+ * know whether *both* sides have reviewed, which means counting rows in
+ * `reviews` — but asking that question from inside a policy ON `reviews`
+ * makes Postgres evaluate the policy to answer the policy, and it aborts with
+ * "infinite recursion detected in policy for relation reviews".
+ *
+ * Running as the owner steps outside RLS for the count and breaks the cycle.
+ * It leaks nothing worth having: a bare integer, no stars, no comment, no
+ * author — and only for a booking id the caller already holds.
+ */
+create or replace function booking_review_count(target uuid)
+returns integer language sql stable security definer set search_path = public as $$
+  select count(*)::integer from reviews where booking_id = target;
+$$;
+
 -- The 48-hour blind window (spec §9), enforced in the database so that
 -- reading the REST endpoint directly cannot beat it.
 create policy reviews_read on reviews
@@ -299,7 +317,7 @@ create policy reviews_read on reviews
          where b.id = reviews.booking_id
            and (
              b.completed_at < now() - interval '48 hours'
-             or (select count(*) from reviews r2 where r2.booking_id = b.id) >= 2
+             or booking_review_count(b.id) >= 2
            )
       )
     )
