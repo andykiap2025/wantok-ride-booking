@@ -435,6 +435,18 @@ values ('vehicle-photos', 'vehicle-photos', false),
        ('avatars', 'avatars', false)
 on conflict (id) do nothing;
 
+-- These four are the only policies in the whole schema that live outside the
+-- `public` schema, which makes them the only ones a `drop schema public
+-- cascade` does not remove. Re-running this migration after a reset would
+-- otherwise fail on "policy already exists" — and fail *here*, near the end of
+-- 0003, leaving the later migrations unapplied and the database half-built.
+--
+-- Dropped first so the storage section is re-runnable on its own terms.
+drop policy if exists documents_owner_rw on storage.objects;
+drop policy if exists documents_admin_read on storage.objects;
+drop policy if exists vehicle_photos_read_authenticated on storage.objects;
+drop policy if exists vehicle_photos_owner_write on storage.objects;
+
 -- Documents are served by short-lived signed URLs only. An owner may upload
 -- into their own folder and read it back; nobody else but admin can.
 create policy documents_owner_rw on storage.objects
