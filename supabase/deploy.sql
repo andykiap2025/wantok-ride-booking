@@ -22,7 +22,7 @@
 --     project_url        https://<ref>.supabase.co
 --     service_role_key   the service role key
 --
--- Generated 2026-09-10T07:22:37.111Z
+-- Generated 2026-09-10T08:20:54.793Z
 -- Source: 6 migrations + seed.sql
 -- =====================================================================
 
@@ -1026,6 +1026,7 @@ alter table sos_locations     enable row level security;
 alter table disputes          enable row level security;
 alter table conduct_records   enable row level security;
 alter table audit_log         enable row level security;
+alter table notifications_sent enable row level security;
 
 -- ---------------------------------------------------------------------
 -- Profiles
@@ -1372,6 +1373,17 @@ create policy conduct_read on conduct_records
 
 -- The audit log is readable by admin and written by nobody through the API.
 create policy audit_admin_read on audit_log for select using (is_admin());
+
+-- Internal bookkeeping: which expiry warnings and reminders have already gone
+-- out, so a nightly job that runs twice does not send the 14-day insurance
+-- warning twice.
+--
+-- No client has any business reading or writing it. Enabling RLS with a single
+-- admin-read policy means the default — deny — applies to everyone else. The
+-- job functions are unaffected: cron runs them as the table owner, and an
+-- owner bypasses RLS unless FORCE is set.
+create policy notifications_admin_read on notifications_sent
+  for select using (is_admin());
 
 -- ---------------------------------------------------------------------
 -- Storage: licences and NIDs are never publicly addressable (spec §16)

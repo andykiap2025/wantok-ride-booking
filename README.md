@@ -163,6 +163,12 @@ every migration in order followed by the seed, generated from the same files,
 and it has been verified against a virgin Postgres: 23 tables, 50 RLS
 policies, 4 vehicle classes, 4 live rates.
 
+After it runs, paste `supabase/tests/02-verify-deployment.sql` into the same
+editor. It is read-only and safe against production, and returns one row per
+check — PASS, WARN or FAIL with the actual number beside it, so "it seemed to
+work" becomes a list you can read in ten seconds. A healthy deployment has no
+FAILs.
+
 Either way, first enable **pg_cron** and **pg_net** under Database →
 Extensions. Neither is fatal if missing — the schema installs regardless and
 reports what it skipped — but the scheduled half of the product (expiry sweep,
