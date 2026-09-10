@@ -76,29 +76,50 @@ declare
   request_id bigint;
   base_url text;
   service_key text;
+  http_post regproc;
 begin
-  select decrypted_secret into base_url from vault.decrypted_secrets where name = 'project_url';
-  select decrypted_secret into service_key from vault.decrypted_secrets where name = 'service_role_key';
+  -- Where pg_net puts `http_post` is not fixed.
+  --
+  -- Depending on the version and how the platform installed it, the extension
+  -- registers into `net`, `public` or `extensions`. Hard-coding `net.http_post`
+  -- works on one of those and fails on the others with "function does not
+  -- exist" — from inside a cron job, at 00:05, where nobody is looking.
+  --
+  -- So resolve it rather than assume it. `to_regproc` returns null instead of
+  -- raising when the name is absent, which makes the coalesce safe.
+  http_post := coalesce(
+    to_regproc('net.http_post'),
+    to_regproc('public.http_post'),
+    to_regproc('extensions.http_post')
+  );
 
-  if to_regproc('net.http_post') is null then
+  if http_post is null then
     raise notice 'pg_net is not enabled — cannot invoke %', fn;
     return null;
   end if;
+
+  select decrypted_secret into base_url from vault.decrypted_secrets where name = 'project_url';
+  select decrypted_secret into service_key from vault.decrypted_secrets where name = 'service_role_key';
 
   if base_url is null or service_key is null then
     raise notice 'Vault secrets project_url / service_role_key are not set — cannot invoke %', fn;
     return null;
   end if;
 
-  select net.http_post(
-    url := base_url || '/functions/v1/' || fn,
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || service_key
-    ),
-    body := body,
-    timeout_milliseconds := 20000
-  ) into request_id;
+  -- Dynamic, because the schema is only known at run time. `%s` on a regproc
+  -- renders the properly qualified, quoted name.
+  execute format(
+    'select %s(url := $1, headers := $2, body := $3, timeout_milliseconds := $4)',
+    http_post
+  )
+  into request_id
+  using base_url || '/functions/v1/' || fn,
+        jsonb_build_object(
+          'Content-Type', 'application/json',
+          'Authorization', 'Bearer ' || service_key
+        ),
+        body,
+        20000;
 
   return request_id;
 end;

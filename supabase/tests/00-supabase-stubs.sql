@@ -47,11 +47,17 @@ create table if not exists vault.decrypted_secrets (
   decrypted_secret text
 );
 
--- `authenticated` is a Supabase role the storage policies grant to.
-do $$ begin
-  if not exists (select 1 from pg_roles where rolname = 'authenticated') then
-    create role authenticated;
-  end if;
+-- The three roles every Supabase project has. The storage policies grant to
+-- `authenticated`, and 0007 grants table privileges to all three.
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if not exists (select 1 from pg_roles where rolname = r) then
+      execute format('create role %I nologin', r);
+    end if;
+  end loop;
 end $$;
 
 -- pg_cron and pg_net are Supabase-managed extensions and cannot be installed
