@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Wantok Ride",
+    "slug": "wantok-ride",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "wantokride",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F6F7F9",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#141A21"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "pg.skyworks.wantokride",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Wantok Ride uses your location to set your pick-up point and show the vehicles nearest you.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Wantok Ride shares your location during a trip, and for 60 minutes after an SOS, so we can find you."
+      }
+    },
+    "android": {
+      "package": "pg.skyworks.wantokride",
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CALL_PHONE"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#141A21"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "comment": "The Play Store ships two builds from this one codebase. WANTOK_VARIANT selects which shell boots: 'customer' or 'driver'. Unset shows the role picker, which is the development default."
+    }
+  }
+}

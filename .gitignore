@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.export/
+.expo/
+*.log
+
+# Local environment. Real values live in the EAS build profile and in
+# `supabase secrets`, never in the repo.
+.env
+.env.local

@@ -1,0 +1,15 @@
+{
+  "name": "@wantok/core",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Wantok Ride domain engine: fares, booking state machine, commission ledger, trust rules.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./*": "./src/*.js"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  }
+}
