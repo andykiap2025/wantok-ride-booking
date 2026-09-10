@@ -2,7 +2,7 @@
   "name": "wantok-ride",
   "private": true,
   "version": "1.0.0",
-  "description": "Wantok Ride — passenger/vehicle marketplace for Port Moresby. Skyworks Systems.",
+  "description": "Wantok Ride \u2014 passenger/vehicle marketplace for Port Moresby. Skyworks Systems.",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -13,7 +13,9 @@
     "admin": "npm run dev --workspace @wantok/admin",
     "sync:core": "node scripts/sync-core.mjs",
     "db:reset": "supabase db reset",
-    "functions:deploy": "npm run sync:core && supabase functions deploy"
+    "functions:deploy": "npm run sync:core && supabase functions deploy",
+    "build:deploy": "node scripts/build-deploy-sql.mjs",
+    "test:db": "bash scripts/test-db.sh"
   },
   "allowScripts": {
     "esbuild@0.28.2": true

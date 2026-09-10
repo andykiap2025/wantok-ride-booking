@@ -71,6 +71,84 @@ export function watchLiveBoard(onChange) {
   return () => supabase.removeChannel(channel);
 }
 
+/**
+ * The live fleet, for the console map.
+ *
+ * Two reads rather than a join, deliberately. `driver_status` carries the
+ * positions and `bookings` carries what each vehicle is doing; joining them in
+ * the database would mean a view that has to be maintained alongside both, and
+ * at launch scale — spec §20 says 8 to 12 vehicles — merging a dozen rows in
+ * the browser costs nothing.
+ *
+ * Every vehicle that is online appears, whether it is carrying anyone or not.
+ * An idle vehicle sitting in Gerehu for two hours is exactly the sort of thing
+ * an operator wants to see on a map.
+ */
+export async function getLiveFleet() {
+  const [positions, active, vehicles] = await Promise.all([
+    supabase
+      .from('driver_status')
+      .select('driver_id, vehicle_id, is_online, lat, lng, heading, last_ping_at')
+      .eq('is_online', true)
+      .then(unwrap),
+    supabase
+      .from('bookings')
+      .select('id, reference, state, vehicle_id, driver_id, customer_id, quoted_fare, ' +
+              'pickup_lat, pickup_lng, pickup_label, dest_lat, dest_lng, dest_label, ' +
+              'started_at, arrived_at, en_route_at, confirmed_at, is_scheduled, scheduled_for, ' +
+              'profiles!bookings_customer_id_fkey(full_name, phone)')
+      .in('state', ['CONFIRMED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'])
+      .then(unwrap),
+    supabase
+      .from('vehicles')
+      .select('id, registration_no, make, model, colour, class_code, seats, status, ' +
+              'drivers(profiles(full_name, phone))')
+      .then(unwrap),
+  ]);
+
+  const vehicleById = new Map(vehicles.map((v) => [v.id, v]));
+  const bookingByVehicle = new Map(active.map((b) => [b.vehicle_id, b]));
+
+  const fleet = positions
+    // A position with no fix is not a position. Plotting 0,0 would put a
+    // vehicle in the Atlantic, which is worse than not drawing it.
+    .filter((p) => p.lat !== null && p.lng !== null)
+    .map((p) => {
+      const vehicle = vehicleById.get(p.vehicle_id) ?? null;
+      const booking = bookingByVehicle.get(p.vehicle_id) ?? null;
+      const ageSeconds = (Date.now() - new Date(p.last_ping_at).getTime()) / 1000;
+      return {
+        ...p,
+        vehicle,
+        booking,
+        driverName: vehicle?.drivers?.profiles?.full_name ?? null,
+        driverPhone: vehicle?.drivers?.profiles?.phone ?? null,
+        ageSeconds,
+        // Spec §13: ten minutes without a ping and it drops off the customer
+        // list. The console still shows it, greyed, because a vehicle that has
+        // gone quiet mid-trip is precisely what an operator needs to notice.
+        stale: ageSeconds > 600,
+      };
+    });
+
+  // A booking whose vehicle is not reporting at all. These never appear on the
+  // map, so they are returned separately rather than silently dropped.
+  const unreported = active.filter((b) => !positions.some((p) => p.vehicle_id === b.vehicle_id));
+
+  return { fleet, unreported };
+}
+
+/** Live driver positions for the console map. */
+export function watchFleet(onMove) {
+  const channel = supabase
+    .channel('admin:fleet')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_status' }, (payload) =>
+      onMove(payload.new),
+    )
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}
+
 // --- SOS -----------------------------------------------------------------
 
 export const getOpenSos = () =>

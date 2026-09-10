@@ -8,3 +8,7 @@ dist/
 # `supabase secrets`, never in the repo.
 .env
 .env.local
+
+# Supabase CLI scratch state
+supabase/.temp/
+supabase/.branches/

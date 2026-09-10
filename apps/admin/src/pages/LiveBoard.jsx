@@ -15,12 +15,18 @@
  * So the age of each state is a column, and rows go amber and then red as
  * they sit. The board is sorted by how stuck a trip is, not by when it
  * started — the thing that needs attention should be at the top.
+ *
+ * The map above it answers the other half of the question. A table says a trip
+ * has been en route for 25 minutes; the map says the vehicle is stationary on
+ * the Hubert Murray Highway, which is a different problem with a different
+ * phone call attached to it.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { BookingState, formatKina, secondsToAccept } from '@wantok/core';
 import * as api from '../api';
+import LiveMap from '../components/LiveMap';
 
 /** How long a state should normally last, in seconds, before it looks stuck. */
 const PATIENCE = {
@@ -102,7 +108,9 @@ export default function LiveBoard() {
       </div>
 
       <div className="page-body">
-        <div className="grid stats" style={{ marginBottom: 18 }}>
+        <LiveMap />
+
+        <div className="grid stats" style={{ marginTop: 18, marginBottom: 18 }}>
           {[
             [BookingState.REQUESTED, 'Waiting on driver'],
             [BookingState.CONFIRMED, 'Confirmed'],

@@ -110,7 +110,17 @@ begin
   )
   on conflict do nothing;  -- a replayed offline sync must not double-charge
 
-  update vehicles set trips_completed = trips_completed + 1 where id = new.vehicle_id;
+  -- Only count the trip if the entry was actually written.
+  --
+  -- `on conflict do nothing` already protects the money, but the trip count
+  -- has to be protected by the same test or a replayed completion inflates a
+  -- vehicle's record without charging it — which shows up months later as a
+  -- rating denominator nobody can reconcile. FOUND is false when the conflict
+  -- swallowed the insert.
+  if found then
+    update vehicles set trips_completed = trips_completed + 1 where id = new.vehicle_id;
+  end if;
+
   return new;
 end;
 $$;
@@ -385,5 +395,5 @@ begin
 end;
 $$;
 
--- Scheduled with pg_cron in 0004_cron.sql. Kept as plain functions so they
+-- Scheduled with pg_cron in 0006_cron.sql. Kept as plain functions so they
 -- can also be run by hand from the console during the pilot.

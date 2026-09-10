@@ -15,8 +15,9 @@
 -- argument. The apps convert at the edges.
 -- =====================================================================
 
+-- gen_random_uuid(). Nothing here needs PostGIS: positions are plain
+-- lat/lng doubles, and the only distance maths is haversine on the handset.
 create extension if not exists "pgcrypto";
-create extension if not exists "postgis" schema extensions;
 
 -- ---------------------------------------------------------------------
 -- Enums
@@ -380,12 +381,23 @@ create table ledger_entries (
   created_by    uuid references profiles (id),
   created_at    timestamptz not null default now(),
 
-  constraint amount_is_positive check (amount >= 0),
-  -- One commission entry per booking, so a retried sync cannot double-charge.
-  unique nulls not distinct (booking_id, entry_type)
+  constraint amount_is_positive check (amount >= 0)
 );
 
 create index ledger_vehicle_idx on ledger_entries (vehicle_id, created_at);
+
+-- One commission entry per booking, so a retried offline sync cannot charge
+-- the same trip twice.
+--
+-- A partial index rather than a table constraint, and the `where` clause is
+-- the whole point: it applies *only* to commission rows that name a booking.
+-- Payments and adjustments carry no booking_id and must stay freely
+-- repeatable — an owner settles up every week, and a constraint that treated
+-- their null booking_id as a duplicate would refuse every payment after the
+-- first.
+create unique index ledger_one_commission_per_booking
+  on ledger_entries (booking_id)
+  where entry_type = 'COMMISSION' and booking_id is not null;
 
 -- Financial records are kept 7 years (spec §16). Nothing deletes them.
 create rule ledger_no_delete as on delete to ledger_entries do instead nothing;

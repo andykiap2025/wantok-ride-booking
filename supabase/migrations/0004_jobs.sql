@@ -7,7 +7,17 @@
 -- entry points and the two tables the senders write to.
 -- =====================================================================
 
-create extension if not exists pg_net;
+-- pg_net lets Postgres call an edge function from a cron job. If it is not
+-- enabled the tables and functions below still install; only the outbound
+-- call is inert, and `invoke_edge_function` says so rather than erroring.
+do $$
+begin
+  if exists (select 1 from pg_available_extensions where name = 'pg_net') then
+    create extension if not exists pg_net;
+  else
+    raise notice 'pg_net is not available. Scheduled jobs will not be able to call edge functions.';
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------
 -- Delivery
@@ -69,6 +79,16 @@ declare
 begin
   select decrypted_secret into base_url from vault.decrypted_secrets where name = 'project_url';
   select decrypted_secret into service_key from vault.decrypted_secrets where name = 'service_role_key';
+
+  if to_regproc('net.http_post') is null then
+    raise notice 'pg_net is not enabled — cannot invoke %', fn;
+    return null;
+  end if;
+
+  if base_url is null or service_key is null then
+    raise notice 'Vault secrets project_url / service_role_key are not set — cannot invoke %', fn;
+    return null;
+  end if;
 
   select net.http_post(
     url := base_url || '/functions/v1/' || fn,

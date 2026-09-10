@@ -74,11 +74,21 @@ knowing about:
 migrations/0001_schema.sql      Tables, constraints, indexes
 migrations/0002_functions.sql   Triggers, views, nightly jobs
 migrations/0003_rls.sql         Row-level security, deny by default
-migrations/0004_cron.sql        Six scheduled jobs
-migrations/0005_jobs.sql        Push tokens, SMS log, job entry points
+migrations/0006_cron.sql        Six scheduled jobs
+migrations/0004_jobs.sql        Push tokens, SMS log, job entry points
 functions/                      Edge functions (Deno)
 seed.sql                        Vehicle classes and the launch rate table
 ```
+
+Run against a throwaway Postgres with `npm run test:db` — it builds a cluster
+in a temp directory, applies every migration and the seed, then runs 46
+assertions covering what only the database can enforce. It needs no Docker and
+never touches the live project.
+
+That exercise is not decorative. It found three real bugs before deployment: a
+`postgis` extension declared but never used, a trip counter that incremented on
+a replayed completion, and a unique constraint that would have refused every
+owner payment after the first.
 
 Three things the database owns outright, so no client can get them wrong:
 
@@ -125,12 +135,46 @@ not a key rotation.
 
 ```bash
 npm install
-npm test                     # verify the engine
+npm test                     # 147 engine tests
+npm run test:db              # migrations + 47 behaviour tests, throwaway Postgres
+```
 
+### Deploying the database
+
+Two routes. Both end in the same place.
+
+**With the CLI**, if it is linked to the project:
+
+```bash
 supabase link --project-ref <ref>
-supabase db push             # migrations 0001–0005
+supabase db push             # migrations 0001–0006
 psql "$DATABASE_URL" -f supabase/seed.sql
+```
 
+**Without it** — paste-and-run, for when the dashboard is open and the CLI is
+not linked:
+
+```bash
+npm run build:deploy         # writes supabase/deploy.sql
+```
+
+Then paste `supabase/deploy.sql` into the SQL Editor and run it once. It is
+every migration in order followed by the seed, generated from the same files,
+and it has been verified against a virgin Postgres: 23 tables, 50 RLS
+policies, 4 vehicle classes, 4 live rates.
+
+Either way, first enable **pg_cron** and **pg_net** under Database →
+Extensions. Neither is fatal if missing — the schema installs regardless and
+reports what it skipped — but the scheduled half of the product (expiry sweep,
+booking reminders, the 45-minute release, weekly statements, retention) does
+not run without them.
+
+Then set two Vault secrets so the cron jobs can reach the edge functions:
+`project_url` and `service_role_key`.
+
+### Deploying the functions
+
+```bash
 npm run sync:core            # vendor the engine into functions/
 supabase functions deploy
 ```
