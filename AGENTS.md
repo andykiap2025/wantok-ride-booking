@@ -140,7 +140,5 @@ Kept honest rather than buried:
 - **Second-line SOS escalation.** See `docs/sos-escalation.md`.
 - **Push token registration.** The `push_tokens` table and the sender exist;
   the app does not yet register a token on sign-in.
-- **`send-notifications` edge function.** Referenced by the document-expiry and
-  weekly-statement jobs in `0004_jobs.sql`; not written.
 - **Admin MFA.** Spec §16 requires a second factor on the console. Enforced at
   the Supabase project level, not yet switched on.
